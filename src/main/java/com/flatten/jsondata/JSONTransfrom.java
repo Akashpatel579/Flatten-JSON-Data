@@ -16,11 +16,7 @@ import java.util.List;
 
 public class JSONTransfrom {
 	public static void main(String[] args) {
-
-		SparkConf sparkConf = new SparkConf().setAppName("SPARK-JSON-Transform");
-
-
-		System.out.println("!! Welcome to SPARK APPLICATION !!");
+		SparkConf sparkConf = new SparkConf().setAppName("SPARK-JSON-Transformation");
 
 		JavaSparkContext jsc = new JavaSparkContext(sparkConf);
 
@@ -32,14 +28,14 @@ public class JSONTransfrom {
 		spark.sparkContext().setLogLevel("ERROR");
 
 
-		List<String> jsonData = Arrays.asList("{\"name\":\"John\",\"age\":30,\"bike\":{\"name\":\"Bajaj\",\"models\":[\"Dominor\",\"Pulsar\"]},\"cars\":[{\"name\":\"Ford\",\"models\":[\"Fiesta\",\"Focus\",\"Mustang\"]},{\"name\":\"BMW\",\"models\":[\"320\",\"X3\",\"X5\"]},{\"name\":\"Fiat\",\"models\":[\"500\",\"Panda\"]}]}\n");
-		Dataset<String> bikerPeopleDataset = spark.createDataset(jsonData, Encoders.STRING());
-		Dataset<Row> bikerDataset = spark.read().json(bikerPeopleDataset);
-		bikerDataset.show();
+		List<String> jsonData = Arrays.asList("{\"name\":\"Akash\",\"age\":26,\"watches\":{\"name\":\"Apple\",\"models\":[\"Apple Watch Series 5\",\"Apple Watch Nike\"]},\"phones\":[{\"name\":\"Apple\",\"models\":[\"iphone X\",\"iphone XR\",\"iphone XS\",\"iphone 11\",\"iphone 11 Pro\"]},{\"name\":\"Samsung\",\"models\":[\"Galaxy Note10\",\"Galaxy S10e\",\"Galaxy S10\"]},{\"name\":\"Google\",\"models\":[\"Pixel 3\",\"Pixel 3a\"]}]}");
+		Dataset<String> myTechDataset = spark.createDataset(jsonData, Encoders.STRING());
+		Dataset<Row> accessoriesDataset = spark.read().json(myTechDataset);
+		accessoriesDataset.show();
 
-		Dataset flat_ds = flattenJSONdf(bikerDataset);
+		Dataset flattened_ds = flattenJSONdf(accessoriesDataset);
 
-		flat_ds.show();
+		flattened_ds.show();
 
 		spark.stop();
 		spark.close();
@@ -49,28 +45,18 @@ public class JSONTransfrom {
 
 		StructField[] fields = ds.schema().fields();
 
-		//Before Java8
 		List<String> fieldsNames = new ArrayList<>();
 		for (StructField s : fields) {
 			fieldsNames.add(s.name());
 		}
 
 		for (int i = 0; i < fields.length; i++) {
+
 			StructField field = fields[i];
-
-			System.out.println("fieldStructField :::::::" + field);
-
 			DataType fieldType = field.dataType();
-
-			System.out.println("fieldType::::::" + fieldType);
-
 			String fieldName = field.name();
 
-			System.out.println("fieldName::::::" + fieldName);
-
 			if (fieldType instanceof ArrayType) {
-				System.out.println("Array Column");
-
 				List<String> fieldNamesExcludingArray = new ArrayList<String>();
 				for (String fieldName_index : fieldsNames) {
 					if (!fieldName.equals(fieldName_index))
@@ -81,21 +67,15 @@ public class JSONTransfrom {
 				String s = String.format("explode_outer(%s) as %s", fieldName, fieldName);
 				fieldNamesAndExplode.add(s);
 
-				System.out.println("All Array column ready >>>>");
-				System.out.println(Arrays.toString(fieldNamesAndExplode.toArray()));
+				String[]  exFieldsWithArray = new String[fieldNamesAndExplode.size()];
+				Dataset exploded_ds = ds.selectExpr(fieldNamesAndExplode.toArray(exFieldsWithArray));
 
+				// explodedDf.show();
 
-				String[]  ex = new String[fieldNamesAndExplode.size()];
-				Dataset explodedDf = ds.selectExpr(fieldNamesAndExplode.toArray(ex));
+				return flattenJSONdf(exploded_ds);
 
-				System.out.println(" Please view Explode at array level");
-				explodedDf.show();
-
-				return flattenJSONdf(explodedDf);
-
-			} else if (fieldType instanceof StructType) {
-
-				System.out.println("Struct Column");
+			}
+			else if (fieldType instanceof StructType) {
 
 				String[] childFieldnames_struct = ((StructType) fieldType).fieldNames();
 
@@ -104,8 +84,6 @@ public class JSONTransfrom {
 					childFieldnames.add(fieldName + "." + childName);
 				}
 
-				System.out.println(Arrays.toString(childFieldnames.toArray()));
-
 				List<String> newfieldNames = new ArrayList<>();
 				for (String fieldName_index : fieldsNames) {
 					if (!fieldName.equals(fieldName_index))
@@ -113,8 +91,6 @@ public class JSONTransfrom {
 				}
 
 				newfieldNames.addAll(childFieldnames);
-				System.out.println("All struct column ready >>>>");
-				System.out.println(Arrays.toString(newfieldNames.toArray()));
 
 				List<Column> renamedStrutctCols = new ArrayList<>();
 
